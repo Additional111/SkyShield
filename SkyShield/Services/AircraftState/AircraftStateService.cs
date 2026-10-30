@@ -1,31 +1,53 @@
 ﻿using System.Collections.Concurrent;
+using SkyShield.Models;
 
 namespace SkyShield.Services.AircraftState;
 
 public class AircraftStateService : IAircraftStateService
 {
-    private readonly ConcurrentDictionary<string, AircraftStateEntry> _aircraft = new();
+    private readonly ConcurrentDictionary<string, AircraftMessage> _aircraft = new();
 
-    public AircraftStateEntry? GetState(string icao)
+    private readonly ConcurrentDictionary<string, object> _locks = new();
+
+    public AircraftMessage? GetState(string icao)
     {
-        _aircraft.TryGetValue(icao, out var state);
+        var lockObject = _locks.GetOrAdd(icao, _ => new object());
 
-        return state;
+        lock (lockObject)
+        {
+            if (_aircraft.TryGetValue(icao, out var message))
+            {
+                return CopyMessage(message);
+            }
+
+            return null;
+        }
     }
 
-    public AircraftStateEntry? UpdateState(AircraftStateEntry state)
+    public AircraftMessage? UpdateState(AircraftMessage message)
     {
-        AircraftStateEntry? previousState = null;
+        var lockObject = _locks.GetOrAdd(message.Icao, _ => new object());
 
-        _aircraft.AddOrUpdate(
-            state.Icao,
-            state,
-            (key, oldState) =>
-            {
-                previousState = oldState;
-                return state;
-            });
+        lock (lockObject)
+        {
+            _aircraft.TryGetValue(message.Icao, out var previousState);
 
-        return previousState;
+            _aircraft[message.Icao] = CopyMessage(message);
+
+            return previousState == null ? null : CopyMessage(previousState);
+        }
+    }
+
+    private static AircraftMessage CopyMessage(AircraftMessage message)
+    {
+        return new AircraftMessage
+        {
+            Icao = message.Icao,
+            Latitude = message.Latitude,
+            Longitude = message.Longitude,
+            AltitudeFeet = message.AltitudeFeet,
+            GroundSpeedKnots = message.GroundSpeedKnots,
+            TimestampUtc = message.TimestampUtc
+        };
     }
 }

@@ -1,8 +1,10 @@
-﻿namespace SkyShield.Services.AircraftState;
+﻿using SkyShield.Models;
+
+namespace SkyShield.Services.AircraftState;
 
 public interface IAircraftStateService
 {
-    AircraftStateEntry? GetState(string icao);
+    AircraftMessage? GetState(string icao);
 
-    AircraftStateEntry? UpdateState(AircraftStateEntry state);
+    AircraftMessage? UpdateState(AircraftMessage message);
 }
