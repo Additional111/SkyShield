@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SkyShield – Dashboard monitorizare aeronave</title>
+  <!-- Leaflet (harta) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="css/dashboard.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark">◆</span>
+      <h1>SkyShield</h1>
+      <span class="brand-sub">Monitorizare telemetrie aeronave</span>
+    </div>
+    <div class="status-group">
+      <div class="status-pill" id="connection-status" data-state="disconnected">
+        <span class="dot"></span><span class="label">Deconectat</span>
+      </div>
+      <div class="status-pill" id="system-status" data-state="unknown">
+        <span class="dot"></span><span class="label">Sistem: necunoscut</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="panel panel-map">
+      <div class="panel-head"><h2>Hartă live</h2><span class="muted" id="aircraft-count">0 aeronave</span></div>
+      <div id="map"></div>
+    </section>
+
+    <aside class="side">
+      <section class="panel">
+        <div class="panel-head"><h2>Risc general</h2></div>
+        <div class="risk-overview">
+          <div class="risk-box" data-level="low"><span class="num" id="risk-low">0</span><span>Scăzut</span></div>
+          <div class="risk-box" data-level="medium"><span class="num" id="risk-medium">0</span><span>Mediu</span></div>
+          <div class="risk-box" data-level="critical"><span class="num" id="risk-critical">0</span><span>Critic</span></div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head"><h2>Aeronavă selectată</h2></div>
+        <div id="aircraft-details" class="details muted">Selectează o aeronavă pe hartă sau în tabel.</div>
+      </section>
+
+      <section class="panel panel-alerts">
+        <div class="panel-head"><h2>Alerte</h2><span class="muted" id="alert-count">0</span></div>
+        <ul id="alerts-list" class="alerts"><li class="muted empty">Nicio alertă încă.</li></ul>
+      </section>
+    </aside>
+
+    <section class="panel panel-table">
+      <div class="panel-head"><h2>Aeronave</h2></div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>ICAO</th><th>Latitudine</th><th>Longitudine</th><th>Altitudine (ft)</th><th>Viteză (kt)</th><th>Ultima actualizare</th></tr>
+          </thead>
+          <tbody id="aircraft-table"><tr><td colspan="6" class="muted empty">Se așteaptă date…</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <!-- Biblioteci externe -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@microsoft/signalr@8.0.7/dist/browser/signalr.min.js"></script>
+  <!-- Fișierele noastre JS: mersul este de la stânga la dreapta, fiecare îl folosește pe precedentul -->
+  <script src="js/config.js"></script>
+  <script src="js/state.js"></script>
+  <script src="js/map.js"></script>
+  <script src="js/table.js"></script>
+  <script src="js/alerts.js"></script>
+  <script src="js/status.js"></script>
+  <script src="js/details.js"></script>
+  <script src="js/mock-data.js"></script>
+
+</body>
+</html>
