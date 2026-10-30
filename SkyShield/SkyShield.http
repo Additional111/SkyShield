@@ -1,0 +1,6 @@
+@SkyShield_HostAddress = http://localhost:5289
+
+GET {{SkyShield_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
