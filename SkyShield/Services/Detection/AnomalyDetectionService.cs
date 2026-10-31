@@ -1,6 +1,5 @@
 ﻿using SkyShield.Models;
 using SkyShield.Services.AircraftState;
-using SkyShield.Services.RiskScoring;
 
 namespace SkyShield.Services.Detection;
 
@@ -8,16 +7,13 @@ public class AnomalyDetectionService : IAnomalyDetectionService
 {
     private readonly IAircraftStateService _aircraftStateService;
     private readonly IEnumerable<IDetectionRule> _rules;
-    private readonly IRiskScoringService _riskScoringService;
 
     public AnomalyDetectionService(
         IAircraftStateService aircraftStateService,
-        IEnumerable<IDetectionRule> rules,
-        IRiskScoringService riskScoringService)
+        IEnumerable<IDetectionRule> rules)
     {
         _aircraftStateService = aircraftStateService;
         _rules = rules;
-        _riskScoringService = riskScoringService;
     }
 
     public Task<IReadOnlyList<AnomalyAlert>> AnalyzeAsync(
@@ -52,18 +48,6 @@ public class AnomalyDetectionService : IAnomalyDetectionService
             if (alert != null)
             {
                 alerts.Add(alert);
-            }
-        }
-
-        if (alerts.Count > 0)
-        {
-            var riskScore = _riskScoringService.CalculateRiskScore(
-                message.Icao,
-                alerts);
-
-            foreach (var alert in alerts)
-            {
-                alert.RiskScore = riskScore.Score;
             }
         }
 

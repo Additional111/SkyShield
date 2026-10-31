@@ -2,6 +2,7 @@
 using SkyShield.Models;
 using SkyShield.Services.Ingestion;
 using SkyShield.Services.Detection;
+using SkyShield.Services.RiskScoring;
 
 namespace SkyShield.Controllers;
 
@@ -11,13 +12,16 @@ public class FlightsController : ControllerBase
 {
     private readonly AircraftValidationService _validationService;
     private readonly IAnomalyDetectionService _detectionService;
+    private readonly IRiskScoringService _riskScoringService;
 
     public FlightsController(
         AircraftValidationService validationService,
-        IAnomalyDetectionService detectionService)
+        IAnomalyDetectionService detectionService,
+        IRiskScoringService riskScoringService)
     {
         _validationService = validationService;
         _detectionService = detectionService;
+        _riskScoringService = riskScoringService;
     }
 
     [HttpPost]
@@ -38,11 +42,16 @@ public class FlightsController : ControllerBase
             message,
             cancellationToken);
 
+        var riskScore = _riskScoringService.CalculateRiskScore(
+            message.Icao,
+            alerts);
+
         return Ok(new
         {
             Success = true,
             Icao = message.Icao,
-            Alerts = alerts
+            Alerts = alerts,
+            RiskScore = riskScore
         });
     }
 }

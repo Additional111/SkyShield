@@ -30,7 +30,7 @@ public class GhostAircraftRule : IDetectionRule
 
         return new AnomalyAlert
         {
-            Icao = message.Icao,
+            Icao = icao,
             AnomalyType = "Unknown Aircraft",
             Severity = "Medium",
             RiskScore = 30,
