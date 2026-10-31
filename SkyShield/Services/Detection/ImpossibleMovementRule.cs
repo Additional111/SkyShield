@@ -71,7 +71,7 @@ public class ImpossibleMovementRule : IDetectionRule
             Icao = message.Icao,
             AnomalyType = "Impossible Movement",
             Severity = "Critical",
-            RiskScore = 70,
+            RiskScore = 40,
             Description =
                 $"Aircraft moved at {speedKnots:F2} knots, " +
                 $"exceeding the maximum allowed speed of {_maxSpeedKnots:F2} knots.",
