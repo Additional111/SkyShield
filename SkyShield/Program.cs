@@ -1,26 +1,39 @@
 using SkyShield.Services.Ingestion;
+using SkyShield.Services.AircraftState;
+using SkyShield.Services.Detection;
+using SkyShield.Services.RiskScoring;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Configurăm adresa serverului.
 builder.WebHost.UseUrls("http://localhost:5000");
 
-// Înregistrăm serviciile aplicației.
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 
-// Înregistrăm serviciile proprii.
+// Ingestion
 builder.Services.AddScoped<AircraftValidationService>();
+
+// Aircraft state
+builder.Services.AddSingleton<IAircraftStateService, AircraftStateService>();
+
+// Detection engine
+builder.Services.AddScoped<IAnomalyDetectionService, AnomalyDetectionService>();
+
+builder.Services.AddSingleton<IDetectionRule, GhostAircraftRule>();
+builder.Services.AddSingleton<IDetectionRule, ImpossibleMovementRule>();
+builder.Services.AddSingleton<IDetectionRule, AltitudeJumpRule>();
+builder.Services.AddSingleton<IDetectionRule, IdentityDuplicationRule>();
+
+// Risk scoring
+builder.Services.AddSingleton<IRiskScoringService, RiskScoringService>();
 
 var app = builder.Build();
 
-// Configurăm OpenAPI.
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
 }
 
-// Permitem servirea dashboard-ului din wwwroot.
 app.UseDefaultFiles();
 app.UseStaticFiles();
 
