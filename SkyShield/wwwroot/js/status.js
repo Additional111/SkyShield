@@ -1,9 +1,9 @@
 /*
- * status.js — cele două pastile din header.
+ * status.js — the two pills in the header.
  *
- * „Conectat / Deconectat" arată starea legăturii SignalR,
- * „Sistem: OK / degradat" arată starea generală a monitorizării.
- * Ambele citesc din SkyShield.State, deci se actualizează singure.
+ * "Connected / Disconnected" shows the SignalR link state,
+ * "System: OK / degraded" shows the overall monitoring state.
+ * Both read from SkyShield.State, so they update by themselves.
  */
 window.SkyShield = window.SkyShield || {};
 
@@ -11,15 +11,15 @@ SkyShield.Status = (function () {
   var connEl, sysEl;
 
   var CONN = {
-    connected: 'Conectat',
-    connecting: 'Se conectează…',
-    disconnected: 'Deconectat'
+    connected: 'Connected',
+    connecting: 'Connecting…',
+    disconnected: 'Disconnected'
   };
 
   var SYS = {
-    ok: 'Sistem: OK',
-    degraded: 'Sistem: degradat',
-    unknown: 'Sistem: necunoscut'
+    ok: 'System: OK',
+    degraded: 'System: degraded',
+    unknown: 'System: unknown'
   };
 
   function label(el, text) {
@@ -37,7 +37,7 @@ SkyShield.Status = (function () {
     }
 
     if (sysEl) {
-      // 'degraded' folosește culoarea de avertizare, 'unknown' rămâne gri.
+      // 'degraded' uses the warning color, 'unknown' stays gray.
       sysEl.setAttribute('data-state', snap.system === 'degraded' ? 'warning' : snap.system);
       label(sysEl, SYS[snap.system] || snap.system);
     }

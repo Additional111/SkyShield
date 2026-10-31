@@ -1,27 +1,27 @@
 /*
- * map.js — harta Leaflet a dashboardului.
+ * map.js — the dashboard's Leaflet map.
  *
- * Nu își ține propriile date: citește snapshot-ul din state.js și
- * desenează câte un punct pentru fiecare aeronavă. Când un punct este
- * apăsat, aeronava devine „selectată".
+ * It doesn't keep its own data: it reads the snapshot from state.js and
+ * draws one dot per aircraft. When a dot is clicked, the aircraft
+ * becomes "selected".
  */
 window.SkyShield = window.SkyShield || {};
 
 SkyShield.Map = (function () {
-  const CENTER = [45.9432, 24.9668]; // România, aproximativ în mijloc
+  const CENTER = [45.9432, 24.9668]; // Romania, roughly in the middle
   const ZOOM = 6;
 
   let map = null;
-  let fitted = false;          // încadrăm prima dată, apoi lăsăm utilizatorul în pace
-  const markers = new Map();   // icao -> marker Leaflet
+  let fitted = false;          // we frame the aircraft once, then leave the user alone
+  const markers = new Map();   // icao -> Leaflet marker
 
-  // Culorile vin din dashboard.css, ca să existe o singură sursă pentru ele.
+  // Colors come from dashboard.css, so there is a single source for them.
   function cssColor(name, fallback) {
     const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
     return value || fallback;
   }
 
-  // Cel mai mare risc înregistrat pentru fiecare aeronavă, din alertele curente.
+  // The highest recorded risk for each aircraft, from the current alerts.
   function highestRisk(alerts) {
     const byIcao = new Map();
     (alerts || []).forEach((a) => {
@@ -32,14 +32,17 @@ SkyShield.Map = (function () {
   }
 
   function styleFor(icao, riskByIcao, selectedIcao) {
-    const level = SkyShield.State.riskLevel(riskByIcao.get(icao) || 0);
-    const color = level === 'critical' ? cssColor('--critical', '#ef4444')
-                : level === 'medium'  ? cssColor('--medium', '#f59e0b')
-                : cssColor('--low', '#22c55e');
+    const hasAlert = riskByIcao.has(icao);
+    const level = hasAlert ? SkyShield.State.riskLevel(riskByIcao.get(icao)) : null;
+    const color = !hasAlert ? cssColor('--no-risk', '')
+                : level === 'critical' ? cssColor('--critical', '')
+                : level === 'medium'  ? cssColor('--medium', '')
+                : cssColor('--low', '');
+    const border = hasAlert ? color : cssColor('--no-risk-border', '');
     const isSelected = icao === selectedIcao;
     return {
       radius: isSelected ? 9 : 6,
-      color: isSelected ? cssColor('--accent', '#38bdf8') : color,
+      color: isSelected ? cssColor('--accent', '') : border,
       weight: isSelected ? 3 : 2,
       fillColor: color,
       fillOpacity: 0.85
@@ -48,13 +51,24 @@ SkyShield.Map = (function () {
 
   function popupText(a) {
     return '<strong>' + a.icao + '</strong><br />' +
-      'Altitudine: ' + Math.round(a.altitudeFeet).toLocaleString('ro-RO') + ' ft<br />' +
-      'Viteză: ' + Math.round(a.groundSpeedKnots) + ' kt';
+      'Altitude: ' + Math.round(a.altitudeFeet).toLocaleString('en-US') + ' ft<br />' +
+      'Ground speed: ' + Math.round(a.groundSpeedKnots) + ' kt';
   }
 
   function render() {
     if (!map) return;
     const s = SkyShield.State.getSnapshot();
+
+    const mapCountEl = document.querySelector('.panel-map .panel-head span') 
+                    || document.querySelector('.map-panel .panel-head span')
+                    || document.querySelector('.map-panel span')
+                    || document.getElementById('map-aircraft-count');
+    if (mapCountEl) {
+      const count = s.aircraft.length;
+      const label = count === 1 ? 'aircraft' : 'aircrafts';
+      mapCountEl.textContent = `${count} ${label}`;
+    }
+
     const riskByIcao = highestRisk(s.alerts);
     const seen = new Set();
 
@@ -77,7 +91,7 @@ SkyShield.Map = (function () {
       }
     });
 
-    // Aeronave dispărute: scoatem punctele rămase în urmă.
+    // Aircraft that disappeared: remove the leftover dots.
     markers.forEach((marker, icao) => {
       if (!seen.has(icao)) {
         map.removeLayer(marker);
@@ -85,7 +99,7 @@ SkyShield.Map = (function () {
       }
     });
 
-    // La primul set de date ne punem singuri în dreptul aeronavelor.
+    // On the first data set we frame the aircraft ourselves.
     if (!fitted && s.aircraft.length) {
       const bounds = L.latLngBounds(s.aircraft.map((a) => [a.latitude, a.longitude]));
       map.fitBounds(bounds.pad(0.25));
@@ -95,16 +109,15 @@ SkyShield.Map = (function () {
 
   function init() {
     if (!window.L || !document.getElementById('map')) {
-      console.warn('SkyShield: harta nu poate fi pornită (Leaflet lipsește sau div-ul #map nu există).');
+      console.warn('SkyShield: the map cannot start (Leaflet is missing or the #map div does not exist).');
       return;
     }
     map = L.map('map', { center: CENTER, zoom: ZOOM });
-    // OpenStreetMap: gratuit, fără cheie API — varianta sigură pentru hackathon.
+    // OpenStreetMap: free, no API key — the safe choice for the hackathon.
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '&copy; OpenStreetMap contributors',
       maxZoom: 19
     }).addTo(map);
-
 
     SkyShield.State.onChange(render);
     render();

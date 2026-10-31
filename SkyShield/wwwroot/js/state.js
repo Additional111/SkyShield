@@ -1,92 +1,126 @@
 /*
- * state.js — singura sursă de adevăr a dashboardului.
+ * state.js — the single source of truth for the dashboard.
  *
- * Toate datele (aeronave, alerte, selecția, starea conexiunii) stau aici.
- * Celelalte fișiere (map, table, alerts, details) doar citesc de aici
- * și se redesenează când ceva se schimbă.
+ * The map, table, alerts and risk panels do not keep their own lists.
+ * They all read from here. That way, a single data update
+ * refreshes the whole interface at once.
  */
 window.SkyShield = window.SkyShield || {};
 
 SkyShield.State = (function () {
-  // Câte alerte păstrăm în listă (cele mai noi primele).
   const MAX_ALERTS = 50;
 
-  // Datele interne.
-  let aircraft = new Map();   // icao -> obiect aeronavă
-  let alerts = [];            // listă de alerte, cea mai nouă prima
-  let selectedIcao = null;    // icao-ul aeronavei selectate (sau null)
-  let connection = 'offline'; // 'offline' | 'connecting' | 'connected'
-  let system = 'ok';          // 'ok' | 'degraded'
+  // ICAO -> { icao, latitude, longitude, altitudeFeet, groundSpeedKnots, timestampUtc }
+  const aircraft = new Map();
+  // Alerts, newest first.
+  const alerts = [];
 
-  // Cine vrea să fie anunțat când se schimbă ceva (hartă, tabel etc.).
+  let selectedIcao = null;
+  let connection = 'disconnected'; // 'disconnected' | 'connecting' | 'connected'
+  let system = 'unknown';          // 'unknown' | 'ok' | 'degraded'
+  let lastMessageAt = null;
+
   const listeners = new Set();
 
   function notify() {
     listeners.forEach((fn) => {
-      try { fn(); } catch (e) { console.error('Eroare într-un listener:', e); }
+      try {
+        fn();
+      } catch (err) {
+        console.error('SkyShield: a listener failed', err);
+      }
     });
   }
 
-  // Un modul se abonează la schimbări; primește înapoi o funcție de dezabonare.
+  // Subscribe to changes; returns an unsubscribe function.
   function onChange(fn) {
     listeners.add(fn);
     return () => listeners.delete(fn);
   }
 
-  // Acceptăm și câmpuri camelCase (JS), și PascalCase (cum vin din C#).
+  function newId() {
+    if (window.crypto && typeof window.crypto.randomUUID === 'function') {
+      return window.crypto.randomUUID();
+    }
+    return 'a-' + Date.now() + '-' + Math.random().toString(16).slice(2);
+  }
+
+  // We accept both camelCase JSON (the team contract) and PascalCase.
   function normalizeAircraft(raw) {
     return {
       icao: raw.icao ?? raw.Icao ?? '',
-      latitude: raw.latitude ?? raw.Latitude ?? 0,
-      longitude: raw.longitude ?? raw.Longitude ?? 0,
-      altitudeFeet: raw.altitudeFeet ?? raw.AltitudeFeet ?? 0,
-      groundSpeedKnots: raw.groundSpeedKnots ?? raw.GroundSpeedKnots ?? 0,
-      timestampUtc: raw.timestampUtc ?? raw.TimestampUtc ?? null
+      latitude: Number(raw.latitude ?? raw.Latitude ?? NaN),
+      longitude: Number(raw.longitude ?? raw.Longitude ?? NaN),
+      altitudeFeet: Number(raw.altitudeFeet ?? raw.AltitudeFeet ?? 0),
+      groundSpeedKnots: Number(raw.groundSpeedKnots ?? raw.GroundSpeedKnots ?? 0),
+      timestampUtc: raw.timestampUtc ?? raw.TimestampUtc ?? new Date().toISOString()
     };
   }
 
-  function normalizeAlert(raw) {
-    return {
-      id: raw.id ?? raw.Id ?? String(Date.now()) + Math.random(),
-      icao: raw.icao ?? raw.Icao ?? '',
-      anomalyType: raw.anomalyType ?? raw.AnomalyType ?? 'Unknown',
-      severity: raw.severity ?? raw.Severity ?? 'Low',
-      riskScore: raw.riskScore ?? raw.RiskScore ?? 0,
-      description: raw.description ?? raw.Description ?? '',
-      detectedAtUtc: raw.detectedAtUtc ?? raw.DetectedAtUtc ?? null,
-      latitude: raw.latitude ?? raw.Latitude ?? null,
-      longitude: raw.longitude ?? raw.Longitude ?? null
-    };
+  function isUsable(a) {
+    return !!a.icao && Number.isFinite(a.latitude) && Number.isFinite(a.longitude);
   }
 
-  // Adaugă sau actualizează o aeronavă.
   function upsertAircraft(raw) {
     const a = normalizeAircraft(raw);
-    if (!a.icao) return;
+    if (!isUsable(a)) return null;
     aircraft.set(a.icao, a);
+    lastMessageAt = new Date().toISOString();
     notify();
+    return a;
   }
 
-  // Înlocuiește toată lista (folosit la încărcarea inițială).
+  // Replaces everything with the list from GET /api/flights.
   function replaceAllAircraft(list) {
-    aircraft = new Map();
+    aircraft.clear();
     (list || []).forEach((raw) => {
       const a = normalizeAircraft(raw);
-      if (a.icao) aircraft.set(a.icao, a);
+      if (isUsable(a)) aircraft.set(a.icao, a);
     });
+    // The selection does not survive an aircraft that left the list.
+    if (selectedIcao && !aircraft.has(selectedIcao)) selectedIcao = null;
+    lastMessageAt = new Date().toISOString();
     notify();
   }
 
-  // Adaugă o alertă nouă la începutul listei.
   function addAlert(raw) {
-    const alert = normalizeAlert(raw);
+    const alert = {
+      id: raw.id ?? raw.Id ?? newId(),
+      icao: raw.icao ?? raw.Icao ?? '',
+      anomalyType: raw.anomalyType ?? raw.AnomalyType ?? '',
+      severity: raw.severity ?? raw.Severity ?? 'Info',
+      riskScore: Math.max(0, Math.min(100, Number(raw.riskScore ?? raw.RiskScore ?? 0))),
+      description: raw.description ?? raw.Description ?? '',
+      detectedAtUtc: raw.detectedAtUtc ?? raw.DetectedAtUtc ?? new Date().toISOString(),
+      latitude: Number(raw.latitude ?? raw.Latitude ?? NaN),
+      longitude: Number(raw.longitude ?? raw.Longitude ?? NaN)
+    };
     alerts.unshift(alert);
     if (alerts.length > MAX_ALERTS) alerts.length = MAX_ALERTS;
+    lastMessageAt = new Date().toISOString();
     notify();
+    return alert;
   }
 
-  // Selectează (sau deselectează cu null) o aeronavă.
+  // Low 0–29, Medium 30–69, Critical 70–100 (agreed with the team).
+  function riskLevel(score) {
+    if (score >= 70) return 'critical';
+    if (score >= 30) return 'medium';
+    return 'low';
+  }
+
+  function riskCounts() {
+    const counts = { low: 0, medium: 0, critical: 0 };
+    alerts.forEach((a) => {
+      counts[riskLevel(a.riskScore)] += 1;
+    });
+    return counts;
+  }
+
+  // We only select aircraft that are present; a missing one does not clear
+  // the current selection (e.g. clicking an alert whose aircraft left the radar).
   function select(icao) {
+    if (!aircraft.has(icao)) return;
     selectedIcao = icao;
     notify();
   }
@@ -95,41 +129,34 @@ SkyShield.State = (function () {
     return selectedIcao ? aircraft.get(selectedIcao) || null : null;
   }
 
-  function setConnection(value) {
-    connection = value;
+  function setConnection(next) {
+    connection = next;
     notify();
   }
 
-  function setSystem(value) {
-    system = value;
+  function setSystem(next) {
+    system = next;
     notify();
   }
 
-  // O copie a datelor, ca nimeni să nu le modifice din greșeală.
+  // A working copy for display: nobody modifies the internal list directly.
   function getSnapshot() {
     return {
       aircraft: Array.from(aircraft.values()),
       alerts: alerts.slice(),
       selectedIcao,
+      selected: getSelected(),
       connection,
-      system
+      system,
+      lastMessageAt,
+      risk: riskCounts()
     };
   }
 
-  // Nivelul de risc după scor: 0-29 scăzut, 30-69 mediu, 70-100 critic.
-  function riskLevel(score) {
-    if (score >= 70) return 'critical';
-    if (score >= 30) return 'medium';
-    return 'low';
-  }
-
-  // Golește tot (folosit la teste).
   function clear() {
-    aircraft = new Map();
-    alerts = [];
+    aircraft.clear();
+    alerts.length = 0;
     selectedIcao = null;
-    connection = 'offline';
-    system = 'ok';
     notify();
   }
 
