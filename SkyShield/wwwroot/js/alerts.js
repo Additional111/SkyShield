@@ -1,10 +1,9 @@
 /*
- * alerts.js — panoul de alerte și rezumatul de risc.
- *
- * Citește alertele din SkyShield.State și:
- *   1. umple lista #alerts-list (cele mai noi primele);
- *   2. numără câte aeronave sunt pe fiecare nivel de risc
- *      și scrie cifrele în #risk-low / #risk-medium / #risk-critical.
+  alerts.js — the alerts panel and the risk summary.
+  Reads the alerts from SkyShield.State and:
+ *   1. fills the #alerts-list (newest first);
+ *   2. counts how many aircraft are on each risk level
+ *      and writes the numbers into #risk-low / #risk-medium / #risk-critical.
  */
 window.SkyShield = window.SkyShield || {};
 
@@ -17,7 +16,7 @@ SkyShield.Alerts = (function () {
       .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
 
-  // Acceptă și camelCase (mock), și PascalCase (serverul .NET).
+  // Accepts both camelCase (mock) and PascalCase (the .NET server).
   function field(obj, camel, pascal) {
     return obj[camel] != null ? obj[camel] : obj[pascal];
   }
@@ -25,7 +24,7 @@ SkyShield.Alerts = (function () {
   function timeOf(iso) {
     var d = new Date(iso);
     if (isNaN(d)) return '';
-    return d.toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    return d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
   }
 
   function alertHtml(a) {
@@ -37,7 +36,7 @@ SkyShield.Alerts = (function () {
     var when = timeOf(field(a, 'detectedAtUtc', 'DetectedAtUtc'));
     return '<li data-level="' + level + '" data-icao="' + esc(icao) + '">'
       + '<strong>' + esc(icao) + '</strong> · ' + esc(type)
-      + ' <span class="muted">(risc ' + score + ', ' + when + ')</span>'
+      + ' <span class="muted">(risk ' + score + ', ' + when + ')</span>'
       + (desc ? '<br><span class="muted">' + esc(desc) + '</span>' : '')
       + '</li>';
   }
@@ -46,15 +45,15 @@ SkyShield.Alerts = (function () {
     var snap = SkyShield.State.getSnapshot();
     var alerts = snap.alerts;
 
-    // 1. Lista de alerte
+    // 1. The alerts list
     countEl.textContent = String(alerts.length);
     if (alerts.length === 0) {
-      listEl.innerHTML = '<li class="muted empty">Nicio alertă încă.</li>';
+      listEl.innerHTML = '<li class="muted empty">No alerts yet.</li>';
     } else {
       listEl.innerHTML = alerts.map(alertHtml).join('');
     }
 
-    // 2. Rezumatul de risc: nivelul maxim pe aeronavă
+    // 2. Risk summary: the highest level per aircraft
     var counts = { low: 0, medium: 0, critical: 0 };
     var worstByIcao = {};
     alerts.forEach(function (a) {
@@ -82,7 +81,7 @@ SkyShield.Alerts = (function () {
     };
     if (!listEl || !countEl) return;
 
-    // Click pe o alertă selectează aeronava (o evidențiază pe hartă și în tabel).
+    // Clicking an alert selects the aircraft (highlights it on the map and in the table).
     listEl.addEventListener('click', function (ev) {
       var li = ev.target.closest('li[data-icao]');
       if (li) SkyShield.State.select(li.getAttribute('data-icao'));
