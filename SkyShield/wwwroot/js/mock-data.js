@@ -1,14 +1,13 @@
 /*
- * mock-data.js — date de test, folosite doar cât backend-ul nu e gata.
+ * mock-data.js — test data, used only while the backend is not ready.
  *
- * Rolul lui: să arate dashboardul viu (hartă, alerte, risc) fără server.
- * Când app.js va fi gata, el hotărăște dacă se folosesc aceste date
- * sau cele reale de la GET /api/flights.
+ * Its role: make the dashboard look alive (map, alerts, risk) without a server.
+ * app.js decides whether this data or the real data from GET /api/flights is used.
  */
 window.SkyShield = window.SkyShield || {};
 
 SkyShield.Mock = (function () {
-  // Câteva aeronave de pornire, în jurul României.
+  // A few starting aircraft, around Romania.
   const BASE = [
     { icao: '4A2B1C', latitude: 44.4170, longitude: 26.0995, altitudeFeet: 35000, groundSpeedKnots: 460 },
     { icao: '4A3D5E', latitude: 45.9432, longitude: 24.9668, altitudeFeet: 38000, groundSpeedKnots: 480 },
@@ -17,19 +16,19 @@ SkyShield.Mock = (function () {
     { icao: '4A7D9E', latitude: 43.9900, longitude: 28.6000, altitudeFeet: 4000,  groundSpeedKnots: 90 }
   ];
 
-  // Alerte de pornire: una de risc mediu, una de risc critic.
+  // Starting alerts: one medium risk, one critical risk.
   const ALERTS = [
     { icao: '4A6B8C', anomalyType: 'SpeedDrop', severity: 'Medium', riskScore: 45,
-      description: 'Scădere bruscă de viteză față de media traseului.', latitude: 45.748, longitude: 21.233 },
+      description: 'Sudden speed drop compared with the route average.', latitude: 45.748, longitude: 21.233 },
     { icao: '4A7D9E', anomalyType: 'UnexpectedDescent', severity: 'Critical', riskScore: 82,
-      description: 'Coborâre neașteptată deasupra zonei maritime.', latitude: 43.99, longitude: 28.60 }
+      description: 'Unexpected descent over the maritime area.', latitude: 43.99, longitude: 28.60 }
   ];
 
-  // Alerte care mai apar din când în când, ca panoul să nu fie static.
+  // Alerts that appear from time to time, so the panel is not static.
   const POOL = [
-    { anomalyType: 'AltitudeDeviation', severity: 'Medium', riskScore: 38, description: 'Abatere de la altitudinea declarată.' },
-    { anomalyType: 'RouteDeviation', severity: 'Low', riskScore: 22, description: 'Ieșire ușoară din corridorul planificat.' },
-    { anomalyType: 'TransponderLoss', severity: 'Critical', riskScore: 88, description: 'Semnal de transponder pierdut.' }
+    { anomalyType: 'AltitudeDeviation', severity: 'Medium', riskScore: 38, description: 'Deviation from the reported altitude.' },
+    { anomalyType: 'RouteDeviation', severity: 'Low', riskScore: 22, description: 'Minor deviation from the planned corridor.' },
+    { anomalyType: 'TransponderLoss', severity: 'Critical', riskScore: 88, description: 'Transponder signal lost.' }
   ];
 
   function install() {
@@ -44,7 +43,7 @@ SkyShield.Mock = (function () {
     }));
   }
 
-  // Mișcăm puțin aeronavele la fiecare 2 secunde, ca harta să pară vie.
+  // We move the aircraft a little every 2 seconds, so the map looks alive.
   function tick() {
     const s = SkyShield.State.getSnapshot();
     s.aircraft.forEach((a) => {
@@ -59,7 +58,7 @@ SkyShield.Mock = (function () {
     });
   }
 
-  // Din 10 în 10 secunde adaugă o alertă nouă, luată din pool.
+  // Every 10 seconds it adds a new alert, taken from the pool.
   let poolIndex = 0;
   function addRandomAlert() {
     const s = SkyShield.State.getSnapshot();
@@ -79,20 +78,22 @@ SkyShield.Mock = (function () {
     });
   }
 
+  let movementTimer = null;
+  let alertTimer = null;
+
   function start() {
+    if (movementTimer !== null) return;
     install();
-    SkyShield.State.setConnection('connected');
-    SkyShield.State.setSystem('ok');
-    // Pornirea hărții se mută în app.js când îl scriem.
-    if (SkyShield.Map && typeof SkyShield.Map.init === 'function') SkyShield.Map.init();
-    setInterval(tick, 2000);
-    setInterval(addRandomAlert, 10000);
+    movementTimer = setInterval(tick, 2000);
+    alertTimer = setInterval(addRandomAlert, 10000);
   }
 
-  return { install, start };
-})();
+  function stop() {
+    clearInterval(movementTimer);
+    clearInterval(alertTimer);
+    movementTimer = null;
+    alertTimer = null;
+  }
 
-// La încărcare, dacă serverul nu e de față, pornim direct cu datele de test.
-if (SkyShield.Config.mockWhenNoServer) {
-  SkyShield.Mock.start();
-}
+  return { install, start, stop };
+})();

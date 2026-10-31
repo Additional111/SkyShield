@@ -1,28 +1,28 @@
 /*
- * table.js — tabelul de jos cu aeronavele.
+ * table.js — the bottom table with the aircraft.
  *
- * Nici el nu își ține date: citește snapshot-ul din state.js și
- * desenează câte un rând pentru fiecare aeronavă. Un click pe un rând
- * selectează aeronava (aceeași selecție folosită și de hartă).
+ * It doesn't keep its own data either: it reads the snapshot from
+ * state.js and draws one row per aircraft. Clicking a row selects
+ * the aircraft (the same selection used by the map).
  */
 window.SkyShield = window.SkyShield || {};
 
 SkyShield.Table = (function () {
   const COLS = 6;
 
-  // Textul vine din server: îl scriem ca text, nu ca HTML, ca să nu strice pagina.
+  // Text comes from the server: we write it as text, not HTML, so it can't break the page.
   function esc(value) {
     return String(value ?? '').replace(/[&<>"']/g, (ch) => ({
       '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
     })[ch]);
   }
 
-  // Timp de genul „acum", „12 s", „3 min" față de ultima actualizare.
+  // Time like "now", "12 s", "3 min" since the last update.
   function timeAgo(iso) {
     const then = new Date(iso).getTime();
     if (!Number.isFinite(then)) return '—';
     const sec = Math.max(0, Math.round((Date.now() - then) / 1000));
-    if (sec < 5) return 'acum';
+    if (sec < 5) return 'now';
     if (sec < 60) return sec + ' s';
     const min = Math.round(sec / 60);
     if (min < 60) return min + ' min';
@@ -38,7 +38,7 @@ SkyShield.Table = (function () {
       cell(a.icao) +
       cell(a.latitude.toFixed(4)) +
       cell(a.longitude.toFixed(4)) +
-      cell(Math.round(a.altitudeFeet).toLocaleString('ro-RO')) +
+      cell(Math.round(a.altitudeFeet).toLocaleString('en-US')) +
       cell(Math.round(a.groundSpeedKnots)) +
       cell(timeAgo(a.timestampUtc), 'muted') +
       '</tr>';
@@ -52,11 +52,11 @@ SkyShield.Table = (function () {
 
     const count = document.getElementById('aircraft-count');
     if (count) {
-      count.textContent = s.aircraft.length + (s.aircraft.length === 1 ? ' aeronavă' : ' aeronave');
+      count.textContent = s.aircraft.length + ' aircraft';
     }
 
     if (!s.aircraft.length) {
-      tbody.innerHTML = '<tr><td colspan="' + COLS + '" class="muted empty">Se așteaptă date…</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="' + COLS + '" class="muted empty">Waiting for data…</td></tr>';
       return;
     }
 
@@ -64,7 +64,7 @@ SkyShield.Table = (function () {
     tbody.innerHTML = rows.map((a) => rowHtml(a, s.selectedIcao)).join('');
   }
 
-  // Un singur ascultător pentru tot tabelul: căutăm rândul apăsat și selectăm aeronava.
+  // A single listener for the whole table: find the clicked row and select the aircraft.
   function init() {
     const tbody = document.getElementById('aircraft-table');
     if (!tbody) return;
@@ -79,7 +79,7 @@ SkyShield.Table = (function () {
   return { init, render };
 })();
 
-// Se leagă singur de stare imediat ce pagina e gata.
+// It hooks itself up to the state as soon as the page is ready.
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', SkyShield.Table.init);
 } else {

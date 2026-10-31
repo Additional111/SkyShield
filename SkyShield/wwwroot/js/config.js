@@ -1,39 +1,35 @@
 /*
- * config.js — adresa backendului, într-un singur loc.
- *
- * Când echipa schimbă portul sau gazda serverului, se modifică aici
- * și atât. Niciun alt fișier JS nu mai conține adrese.
+ * config.js — Backend address.
+ * Modify here if we change the port.
  */
 window.SkyShield = window.SkyShield || {};
 
 SkyShield.Config = (function () {
-  // Gol = pagina e servită de același server (.NET), deci nu avem nevoie de adresă.
-  // Dacă deschizi dashboardul din alt loc, pune aici adresa serverului,
-  // de exemplu: 'http://localhost:5000'
+  // We add here when we finish the app: 'http://localhost:5000'
   const apiBaseUrl = '';
 
   return {
     apiBaseUrl,
 
-    // Datele inițiale, încărcate o singură dată la pornire.
+    // Initial data.
     flightsUrl: apiBaseUrl + '/api/flights',
 
-    // Conectarea live (SignalR).
+    // Live connection (SignalR).
     hubUrl: apiBaseUrl + '/hubs/skyshield',
 
-    // Numele evenimentelor anunțate de server.
+    // Name of events on the server.
     events: {
       aircraftUpdated: 'AircraftUpdated',
       alertRaised: 'AlertRaised'
     },
 
-    // Cât așteaptă între încercările de reconectare (milisecunde).
+    // Between retrying to connect (miliseconds).
     reconnectDelaysMs: [0, 2000, 5000, 10000],
 
-    // Din cât în cât se reia lista completă, ca siguranță dacă s-a pierdut un mesaj.
+    // Sometimes, it loads initial list.
     refreshIntervalMs: 15000,
 
-    // Dacă serverul nu răspunde, se folosesc date de test ca să se vadă dashboardul.
+    // If the server doesn't respond, it uses test data.
     mockWhenNoServer: true
   };
 })();
