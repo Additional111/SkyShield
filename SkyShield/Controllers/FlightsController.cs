@@ -1,4 +1,4 @@
-﻿
+
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
 using SkyShield.Models;
@@ -39,7 +39,6 @@ public class FlightsController : ControllerBase
     public IActionResult GetFlights()
     {
         var aircraft = _aircraftStateService.GetAllStates();
-
         return Ok(aircraft);
     }
 

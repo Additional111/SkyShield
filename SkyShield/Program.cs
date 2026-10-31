@@ -1,3 +1,4 @@
+
 using SkyShield.Services.Ingestion;
 using SkyShield.Services.AircraftState;
 using SkyShield.Services.Detection;
@@ -33,6 +34,7 @@ builder.Services.AddSingleton<IRiskScoringService, RiskScoringService>();
 // Demo Mode
 builder.Services.AddSingleton<DemoAircraftGenerator>();
 builder.Services.AddSingleton<DemoScenarioService>();
+
 if (builder.Environment.IsDevelopment())
 {
     builder.Services.AddHostedService<DemoMovementService>();
@@ -61,4 +63,5 @@ app.UseAuthorization();
 
 app.MapControllers();
 app.MapHub<SkyShieldHub>("/hubs/skyshield");
+
 app.Run();
