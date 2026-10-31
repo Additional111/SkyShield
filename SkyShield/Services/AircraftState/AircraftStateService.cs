@@ -38,6 +38,13 @@ public class AircraftStateService : IAircraftStateService
         }
     }
 
+    public IReadOnlyList<AircraftMessage> GetAllStates()
+    {
+        return _aircraft.Values
+            .Select(CopyMessage)
+            .ToList();
+    }
+
     private static AircraftMessage CopyMessage(AircraftMessage message)
     {
         return new AircraftMessage

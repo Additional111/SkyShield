@@ -1,3 +1,4 @@
+using SkyShield.Hubs;
 using SkyShield.Services.Ingestion;
 using SkyShield.Services.AircraftState;
 using SkyShield.Services.Detection;
@@ -9,6 +10,9 @@ builder.WebHost.UseUrls("http://localhost:5000");
 
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
+
+// SignalR
+builder.Services.AddSignalR();
 
 // Ingestion
 builder.Services.AddScoped<AircraftValidationService>();
@@ -40,5 +44,8 @@ app.UseStaticFiles();
 app.UseAuthorization();
 
 app.MapControllers();
+
+// SignalR Hub endpoint
+app.MapHub<SkyShieldHub>("/hubs/skyshield");
 
 app.Run();

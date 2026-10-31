@@ -108,12 +108,22 @@ SkyShield.Map = (function () {
   }
 
   function init() {
-    if (!window.L || !document.getElementById('map')) {
+    if (map) return;
+
+    const container = document.getElementById('map');
+
+    if (!window.L || !container) {
       console.warn('SkyShield: the map cannot start (Leaflet is missing or the #map div does not exist).');
       return;
     }
-    map = L.map('map', { center: CENTER, zoom: ZOOM });
-    // OpenStreetMap: free, no API key — the safe choice for the hackathon.
+
+    if (container._leaflet_id) {
+      console.warn('SkyShield: map container already initialized.');
+      return;
+    }
+
+    map = L.map(container, { center: CENTER, zoom: ZOOM });
+
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '&copy; OpenStreetMap contributors',
       maxZoom: 19
