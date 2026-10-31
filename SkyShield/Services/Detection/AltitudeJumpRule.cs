@@ -68,7 +68,7 @@ public class AltitudeJumpRule : IDetectionRule
             Icao = message.Icao,
             AnomalyType = "Altitude Jump",
             Severity = "Critical",
-            RiskScore = 70,
+            RiskScore = 25,
             Description =
                 $"Aircraft altitude changed by {altitudeDifference:F2} feet " +
                 $"at a rate of {verticalSpeed:F2} feet per minute.",

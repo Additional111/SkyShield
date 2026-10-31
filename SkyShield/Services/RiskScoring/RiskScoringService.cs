@@ -14,10 +14,7 @@ public class RiskScoringService : IRiskScoringService
 
         foreach (var anomaly in anomalies)
         {
-            int weight = GetWeight(anomaly.AnomalyType);
-
-            totalScore += weight;
-
+            totalScore += anomaly.RiskScore;
             reasons.Add(anomaly.Description);
         }
 
@@ -32,18 +29,6 @@ public class RiskScoringService : IRiskScoringService
             RiskLevel = riskLevel,
             CalculatedAtUtc = DateTimeOffset.UtcNow,
             Reasons = reasons
-        };
-    }
-
-    private static int GetWeight(string anomalyType)
-    {
-        return anomalyType switch
-        {
-            "Unknown Aircraft" => 30,
-            "Impossible Movement" => 40,
-            "Altitude Jump" => 25,
-            "Identity Duplication" => 45,
-            _ => 0
         };
     }
 
