@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
 using SkyShield.Models;
 using SkyShield.Hubs;
@@ -33,14 +34,15 @@ public class FlightsController : ControllerBase
         _hubContext = hubContext;
     }
 
+    // Returns all currently tracked aircraft.
     [HttpGet]
     public IActionResult GetFlights()
     {
         var aircraft = _aircraftStateService.GetAllStates();
-
         return Ok(aircraft);
     }
 
+    // Receives and processes new aircraft telemetry.
     [HttpPost]
     public async Task<IActionResult> ReceiveFlight(
         [FromBody] AircraftMessage message,
@@ -63,11 +65,13 @@ public class FlightsController : ControllerBase
             message.Icao,
             alerts);
 
+        // Notify connected dashboard clients about aircraft updates.
         await _hubContext.Clients.All.SendAsync(
             "AircraftUpdated",
             message,
             cancellationToken);
 
+        // Notify connected dashboard clients about detected anomalies.
         foreach (var alert in alerts)
         {
             await _hubContext.Clients.All.SendAsync(

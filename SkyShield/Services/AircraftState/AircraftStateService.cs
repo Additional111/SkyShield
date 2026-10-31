@@ -57,4 +57,12 @@ public class AircraftStateService : IAircraftStateService
             TimestampUtc = message.TimestampUtc
         };
     }
+    
+    public IReadOnlyList<AircraftMessage> GetAllStates()
+    {
+        return _aircraft.Values
+            .Select(CopyMessage)
+            .ToList();
+    }
+    
 }
