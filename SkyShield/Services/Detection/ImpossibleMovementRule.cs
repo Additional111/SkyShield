@@ -1,93 +1,60 @@
-﻿
 using System.Globalization;
-using Microsoft.Extensions.Configuration;
 using SkyShield.Models;
 
 namespace SkyShield.Services.Detection;
 
+/// <summary>Flags position jumps that would require an impossible ground speed.</summary>
 public class ImpossibleMovementRule : IDetectionRule
 {
+    public const string Type = "Impossible Movement";
+
     private const double DefaultMaxSpeedKnots = 1200.0;
+    private const double MinimumElapsedSeconds = 1.0;
 
     private readonly double _maxSpeedKnots;
 
     public ImpossibleMovementRule(IConfiguration configuration)
     {
-        string? configuredValue =
-            configuration["Detection:MaxMovementSpeedKnots"];
-
-        if (double.TryParse(
-                configuredValue,
-                NumberStyles.Float,
-                CultureInfo.InvariantCulture,
-                out double configuredSpeed) &&
-            double.IsFinite(configuredSpeed) &&
-            configuredSpeed > 0)
-        {
-            _maxSpeedKnots = configuredSpeed;
-        }
-        else
-        {
-            _maxSpeedKnots = DefaultMaxSpeedKnots;
-        }
+        _maxSpeedKnots = double.TryParse(
+            configuration["Detection:MaxMovementSpeedKnots"],
+            NumberStyles.Float, CultureInfo.InvariantCulture, out var v) && v > 0
+            ? v : DefaultMaxSpeedKnots;
     }
 
-    public AnomalyAlert? Detect(
-        AircraftMessage message,
-        AircraftMessage? previousState)
+    public AnomalyAlert? Detect(DetectionContext context)
     {
-        if (previousState == null)
+        var message = context.Message;
+        var previous = context.Previous;
+
+        if (previous == null)
             return null;
 
-        if (message.TimestampUtc == default ||
-            previousState.TimestampUtc == default)
-            return null;
+        double elapsedSeconds = (message.TimestampUtc - previous.TimestampUtc).TotalSeconds;
 
-        if (!IsValidCoordinates(message) ||
-            !IsValidCoordinates(previousState))
-            return null;
-
-        double elapsedHours =
-            (message.TimestampUtc - previousState.TimestampUtc)
-            .TotalHours;
-
-        if (elapsedHours <= 0)
+        // Out-of-order or near-simultaneous messages cannot give a meaningful speed.
+        if (elapsedSeconds < MinimumElapsedSeconds)
             return null;
 
         double distanceKm = HaversineCalculator.CalculateDistance(
-            previousState.Latitude,
-            previousState.Longitude,
-            message.Latitude,
-            message.Longitude);
+            previous.Latitude, previous.Longitude,
+            message.Latitude, message.Longitude);
 
-        double speedKnots = distanceKm / elapsedHours / 1.852;
+        double speedKnots = distanceKm / (elapsedSeconds / 3600.0) / 1.852;
 
-        if (!double.IsFinite(speedKnots) ||
-            speedKnots <= _maxSpeedKnots)
+        if (!double.IsFinite(speedKnots) || speedKnots <= _maxSpeedKnots)
             return null;
 
         return new AnomalyAlert
         {
             Icao = message.Icao,
-            AnomalyType = "Impossible Movement",
-            Severity = "Critical",
-            RiskScore = 40,
+            AnomalyType = Type,
+            RiskScore = 85,
             Description =
-                $"Aircraft moved at {speedKnots:F2} knots, " +
-                $"exceeding the maximum allowed speed of {_maxSpeedKnots:F2} knots.",
-            DetectedAtUtc = message.TimestampUtc,
+                $"Moved {distanceKm:F0} km in {elapsedSeconds:F0} s " +
+                $"({speedKnots:F0} kt, limit {_maxSpeedKnots:F0} kt).",
+            DetectedAtUtc = DateTimeOffset.UtcNow,
             Latitude = message.Latitude,
             Longitude = message.Longitude
         };
-    }
-
-    private static bool IsValidCoordinates(AircraftMessage message)
-    {
-        return double.IsFinite(message.Latitude) &&
-               double.IsFinite(message.Longitude) &&
-               message.Latitude >= -90 &&
-               message.Latitude <= 90 &&
-               message.Longitude >= -180 &&
-               message.Longitude <= 180;
     }
 }

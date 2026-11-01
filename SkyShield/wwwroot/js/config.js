@@ -6,7 +6,7 @@ window.SkyShield = window.SkyShield || {};
 
 SkyShield.Config = (function () {
   // We add here when we finish the app: 'http://localhost:5000'
-  const apiBaseUrl = '';
+  const apiBaseUrl = ''; // same origin as the backend (http://localhost:5000)
 
   return {
     apiBaseUrl,
@@ -20,7 +20,9 @@ SkyShield.Config = (function () {
     // Name of events on the server.
     events: {
       aircraftUpdated: 'AircraftUpdated',
-      alertRaised: 'AlertRaised'
+      alertRaised: 'AlertRaised',
+      systemStatus: 'SystemStatus',
+      simulationReset: 'SimulationReset'
     },
 
     // Between retrying to connect (miliseconds).
@@ -29,7 +31,10 @@ SkyShield.Config = (function () {
     // Sometimes, it loads initial list.
     refreshIntervalMs: 15000,
 
-    // If the server doesn't respond, it uses test data.
-    mockWhenNoServer: true
+    // Offline preview with fake aircraft (off by default: the real backend generates the traffic).
+    mockWhenNoServer: false,
+
+    // Normal monitoring is shown as degraded if no status arrives for this long.
+    statusTimeoutMs: 10000
   };
 })();

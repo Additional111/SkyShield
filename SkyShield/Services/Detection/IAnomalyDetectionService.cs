@@ -1,10 +1,10 @@
-﻿using SkyShield.Models;
+using SkyShield.Models;
+using SkyShield.Services.AircraftState;
 
 namespace SkyShield.Services.Detection;
 
 public interface IAnomalyDetectionService
 {
-    Task<IReadOnlyList<AnomalyAlert>> AnalyzeAsync(
-        AircraftMessage message,
-        CancellationToken cancellationToken = default);
+    /// <summary>Analyzes a message against the given state store (and updates it).</summary>
+    IReadOnlyList<AnomalyAlert> Analyze(AircraftMessage message, IAircraftStateService state);
 }

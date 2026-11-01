@@ -1,45 +1,35 @@
-﻿using SkyShield.Models;
+using SkyShield.Models;
 
 namespace SkyShield.Services.RiskScoring;
 
+/// <summary>
+/// Single place that defines how scores map to severity:
+/// 0-29 Low, 30-59 Medium, 60-79 High, 80-100 Critical.
+/// The total for an aircraft is the sum of its anomaly scores, capped at 100.
+/// </summary>
 public class RiskScoringService : IRiskScoringService
 {
-    public SecurityRiskScore CalculateRiskScore(
-        string icao,
-        IReadOnlyCollection<AnomalyAlert> anomalies)
+    public SecurityRiskScore CalculateRiskScore(string icao, IReadOnlyCollection<AnomalyAlert> anomalies)
     {
-        int totalScore = 0;
-
-        List<string> reasons = new();
-
-        foreach (var anomaly in anomalies)
-        {
-            totalScore += anomaly.RiskScore;
-            reasons.Add(anomaly.Description);
-        }
-
-        totalScore = Math.Clamp(totalScore, 0, 100);
-
-        string riskLevel = GetRiskLevel(totalScore);
+        int total = Math.Clamp(anomalies.Sum(a => a.RiskScore), 0, 100);
 
         return new SecurityRiskScore
         {
             Icao = icao,
-            Score = totalScore,
-            RiskLevel = riskLevel,
+            Score = total,
+            RiskLevel = GetRiskLevel(total),
             CalculatedAtUtc = DateTimeOffset.UtcNow,
-            Reasons = reasons
+            Reasons = anomalies
+                .Select(a => $"{a.AnomalyType} (+{a.RiskScore}): {a.Description}")
+                .ToList()
         };
     }
 
-    private static string GetRiskLevel(int score)
+    public string GetRiskLevel(int score) => score switch
     {
-        if (score >= 70)
-            return "Critical";
-
-        if (score >= 30)
-            return "Medium";
-
-        return "Low";
-    }
+        >= 80 => "Critical",
+        >= 60 => "High",
+        >= 30 => "Medium",
+        _ => "Low"
+    };
 }

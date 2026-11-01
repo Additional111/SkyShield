@@ -1,60 +1,88 @@
-﻿using System.Collections.Concurrent;
+using System.Collections.Concurrent;
 using SkyShield.Models;
 
 namespace SkyShield.Services.AircraftState;
 
+/// <summary>
+/// Thread-safe store with the latest state and a short history per aircraft.
+/// Every instance is independent, so simulation state never mixes with real traffic.
+/// </summary>
 public class AircraftStateService : IAircraftStateService
 {
-    private readonly ConcurrentDictionary<string, AircraftMessage> _aircraft = new();
+    private const int MaxHistory = 20;
 
-    private readonly ConcurrentDictionary<string, object> _locks = new();
+    private sealed class Track
+    {
+        public readonly object Lock = new();
+        public AircraftMessage? Latest;
+        public readonly List<AircraftMessage> History = new();
+    }
+
+    private readonly ConcurrentDictionary<string, Track> _tracks = new();
 
     public AircraftMessage? GetState(string icao)
     {
-        var lockObject = _locks.GetOrAdd(icao, _ => new object());
-
-        lock (lockObject)
-        {
-            if (_aircraft.TryGetValue(icao, out var message))
-            {
-                return CopyMessage(message);
-            }
-
+        if (!_tracks.TryGetValue(Normalize(icao), out var track))
             return null;
-        }
-    }
 
-    public AircraftMessage? UpdateState(AircraftMessage message)
-    {
-        var lockObject = _locks.GetOrAdd(message.Icao, _ => new object());
-
-        lock (lockObject)
+        lock (track.Lock)
         {
-            _aircraft.TryGetValue(message.Icao, out var previousState);
-
-            _aircraft[message.Icao] = CopyMessage(message);
-
-            return previousState == null ? null : CopyMessage(previousState);
+            return track.Latest == null ? null : Copy(track.Latest);
         }
     }
 
     public IReadOnlyList<AircraftMessage> GetAllStates()
     {
-        return _aircraft.Values
-            .Select(CopyMessage)
-            .ToList();
+        var result = new List<AircraftMessage>();
+
+        foreach (var track in _tracks.Values)
+        {
+            lock (track.Lock)
+            {
+                if (track.Latest != null)
+                    result.Add(Copy(track.Latest));
+            }
+        }
+
+        return result;
     }
 
-    private static AircraftMessage CopyMessage(AircraftMessage message)
+    public StateUpdate Update(AircraftMessage message)
     {
-        return new AircraftMessage
+        var copy = Copy(message);
+        var track = _tracks.GetOrAdd(copy.Icao, _ => new Track());
+
+        lock (track.Lock)
         {
-            Icao = message.Icao,
-            Latitude = message.Latitude,
-            Longitude = message.Longitude,
-            AltitudeFeet = message.AltitudeFeet,
-            GroundSpeedKnots = message.GroundSpeedKnots,
-            TimestampUtc = message.TimestampUtc
-        };
+            var previous = track.Latest == null ? null : Copy(track.Latest);
+            var history = track.History.Select(Copy).ToList();
+
+            // Late (out-of-order) messages never overwrite newer state.
+            if (track.Latest == null || copy.TimestampUtc >= track.Latest.TimestampUtc)
+            {
+                track.Latest = copy;
+                track.History.Add(Copy(copy));
+
+                if (track.History.Count > MaxHistory)
+                    track.History.RemoveAt(0);
+            }
+
+            return new StateUpdate(previous, history);
+        }
     }
+
+    public void Clear() => _tracks.Clear();
+
+    private static string Normalize(string? icao) =>
+        (icao ?? string.Empty).Trim().ToUpperInvariant();
+
+    private static AircraftMessage Copy(AircraftMessage m) => new()
+    {
+        Icao = Normalize(m.Icao),
+        Latitude = m.Latitude,
+        Longitude = m.Longitude,
+        AltitudeFeet = m.AltitudeFeet,
+        GroundSpeedKnots = m.GroundSpeedKnots,
+        TimestampUtc = m.TimestampUtc
+    };
 }

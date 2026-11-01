@@ -13,13 +13,14 @@ SkyShield.Status = (function () {
   var CONN = {
     connected: 'Connected',
     connecting: 'Connecting…',
+    reconnecting: 'Reconnecting…',
     disconnected: 'Disconnected'
   };
 
   var SYS = {
-    ok: 'System: OK',
-    degraded: 'System: degraded',
-    unknown: 'System: unknown'
+    ok: 'Monitoring active',
+    degraded: 'Monitoring degraded',
+    unknown: 'Monitoring: unknown'
   };
 
   function label(el, text) {
@@ -40,6 +41,9 @@ SkyShield.Status = (function () {
       // 'degraded' uses the warning color, 'unknown' stays gray.
       sysEl.setAttribute('data-state', snap.system === 'degraded' ? 'warning' : snap.system);
       label(sysEl, SYS[snap.system] || snap.system);
+      if (snap.system === 'ok' && snap.aircraftTotal) {
+        label(sysEl, SYS.ok + ' · ' + snap.aircraftTotal + ' aircraft');
+      }
     }
   }
 

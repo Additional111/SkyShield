@@ -16,20 +16,29 @@ SkyShield.State = (function () {
   const alerts = [];
 
   let selectedIcao = null;
-  let connection = 'disconnected'; // 'disconnected' | 'connecting' | 'connected'
+  let connection = 'disconnected'; // 'disconnected' | 'connecting' | 'reconnecting' | 'connected'
   let system = 'unknown';          // 'unknown' | 'ok' | 'degraded'
+  let lastStatusAt = 0;            // when the last SystemStatus event arrived
+  let aircraftTotal = 0;
   let lastMessageAt = null;
 
   const listeners = new Set();
 
+  // Many updates can arrive in the same moment (one per aircraft): coalesce them
+  // so the map, table and panels re-render once instead of dozens of times.
+  let notifyTimer = null;
   function notify() {
-    listeners.forEach((fn) => {
-      try {
-        fn();
-      } catch (err) {
-        console.error('SkyShield: a listener failed', err);
-      }
-    });
+    if (notifyTimer !== null) return;
+    notifyTimer = setTimeout(() => {
+      notifyTimer = null;
+      listeners.forEach((fn) => {
+        try {
+          fn();
+        } catch (err) {
+          console.error('SkyShield: a listener failed', err);
+        }
+      });
+    }, 50);
   }
 
   // Subscribe to changes; returns an unsubscribe function.
@@ -102,19 +111,48 @@ SkyShield.State = (function () {
     return alert;
   }
 
-  // Low 0–29, Medium 30–69, Critical 70–100 (agreed with the team).
+  // Same thresholds as the backend: Low 0–29, Medium 30–59, High 60–79, Critical 80–100.
   function riskLevel(score) {
-    if (score >= 70) return 'critical';
+    if (score >= 80) return 'critical';
+    if (score >= 60) return 'high';
     if (score >= 30) return 'medium';
     return 'low';
   }
 
+  // Number of aircraft per level, using each aircraft's highest alert.
   function riskCounts() {
-    const counts = { low: 0, medium: 0, critical: 0 };
+    const worst = new Map();
     alerts.forEach((a) => {
-      counts[riskLevel(a.riskScore)] += 1;
+      worst.set(a.icao, Math.max(worst.get(a.icao) || 0, a.riskScore));
+    });
+    const counts = { low: 0, medium: 0, high: 0, critical: 0 };
+    worst.forEach((score) => {
+      counts[riskLevel(score)] += 1;
     });
     return counts;
+  }
+
+  function clearAlerts() {
+    alerts.length = 0;
+    notify();
+  }
+
+  // The server reports whether normal monitoring is running.
+  function setMonitoring(status) {
+    lastStatusAt = Date.now();
+    aircraftTotal = Number(status.aircraftCount ?? status.AircraftCount ?? 0);
+    const active = status.monitoringActive ?? status.MonitoringActive;
+    system = active ? 'ok' : 'degraded';
+    notify();
+  }
+
+  // If statuses stop arriving while connected, monitoring cannot be trusted.
+  function checkStatusFreshness(timeoutMs) {
+    if (connection === 'connected' && lastStatusAt && system === 'ok' &&
+        Date.now() - lastStatusAt > timeoutMs) {
+      system = 'degraded';
+      notify();
+    }
   }
 
   // We only select aircraft that are present; a missing one does not clear
@@ -148,6 +186,7 @@ SkyShield.State = (function () {
       selected: getSelected(),
       connection,
       system,
+      aircraftTotal,
       lastMessageAt,
       risk: riskCounts()
     };
@@ -169,6 +208,9 @@ SkyShield.State = (function () {
     getSelected,
     setConnection,
     setSystem,
+    setMonitoring,
+    checkStatusFreshness,
+    clearAlerts,
     getSnapshot,
     riskLevel,
     clear

@@ -31,15 +31,30 @@ SkyShield.Live = (function () {
       }
     });
 
+    hub.on(config.events.systemStatus, function (status) {
+      if (status && typeof status === 'object') {
+        SkyShield.State.setMonitoring(status);
+      }
+    });
+
+    // `skyshield-cli reset`: drop temporary aircraft and old alerts, keep normal traffic.
+    hub.on(config.events.simulationReset, function (payload) {
+      if (payload && (payload.clearAlerts ?? payload.ClearAlerts)) {
+        SkyShield.State.clearAlerts();
+      }
+      if (SkyShield.App && SkyShield.App.reloadAircraft) SkyShield.App.reloadAircraft();
+    });
+
     hub.onreconnecting(function () {
-      SkyShield.State.setConnection('connecting');
+      SkyShield.State.setConnection('reconnecting');
       SkyShield.State.setSystem('unknown');
     });
 
     hub.onreconnected(function () {
       SkyShield.State.setConnection('connected');
-      // The connection alone does not prove the whole system is healthy.
+      // The next SystemStatus event confirms monitoring; refresh what we missed.
       SkyShield.State.setSystem('unknown');
+      if (SkyShield.App && SkyShield.App.reloadAircraft) SkyShield.App.reloadAircraft();
     });
 
     hub.onclose(function () {

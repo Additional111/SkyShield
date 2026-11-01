@@ -1,12 +1,8 @@
-
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.SignalR;
 using SkyShield.Models;
-using SkyShield.Hubs;
-using SkyShield.Services.Ingestion;
-using SkyShield.Services.Detection;
-using SkyShield.Services.RiskScoring;
 using SkyShield.Services.AircraftState;
+using SkyShield.Services.Ingestion;
+using SkyShield.Services.Processing;
 
 namespace SkyShield.Controllers;
 
@@ -14,78 +10,50 @@ namespace SkyShield.Controllers;
 [Route("api/[controller]")]
 public class FlightsController : ControllerBase
 {
-    private readonly AircraftValidationService _validationService;
-    private readonly IAnomalyDetectionService _detectionService;
-    private readonly IRiskScoringService _riskScoringService;
-    private readonly IAircraftStateService _aircraftStateService;
-    private readonly IHubContext<SkyShieldHub> _hubContext;
+    private readonly AircraftValidationService _validation;
+    private readonly TelemetryProcessor _processor;
+    private readonly IAircraftStateService _state;
 
     public FlightsController(
-        AircraftValidationService validationService,
-        IAnomalyDetectionService detectionService,
-        IRiskScoringService riskScoringService,
-        IAircraftStateService aircraftStateService,
-        IHubContext<SkyShieldHub> hubContext)
+        AircraftValidationService validation,
+        TelemetryProcessor processor,
+        IAircraftStateService state)
     {
-        _validationService = validationService;
-        _detectionService = detectionService;
-        _riskScoringService = riskScoringService;
-        _aircraftStateService = aircraftStateService;
-        _hubContext = hubContext;
+        _validation = validation;
+        _processor = processor;
+        _state = state;
     }
 
-    // Returns all currently tracked aircraft.
+    /// <summary>All currently tracked aircraft.</summary>
     [HttpGet]
-    public IActionResult GetFlights()
+    public IActionResult GetFlights() => Ok(_state.GetAllStates());
+
+    /// <summary>One tracked aircraft.</summary>
+    [HttpGet("{icao}")]
+    public IActionResult GetFlight(string icao)
     {
-        var aircraft = _aircraftStateService.GetAllStates();
-        return Ok(aircraft);
+        var aircraft = _state.GetState(icao);
+        return aircraft == null ? NotFound(new { success = false, error = "Aircraft not tracked." }) : Ok(aircraft);
     }
 
-    // Receives and processes new aircraft telemetry.
+    /// <summary>Ingests one telemetry message from normal traffic.</summary>
     [HttpPost]
     public async Task<IActionResult> ReceiveFlight(
         [FromBody] AircraftMessage message,
         CancellationToken cancellationToken)
     {
-        if (!_validationService.IsValid(message, out string error))
-        {
-            return BadRequest(new
-            {
-                Success = false,
-                Error = error
-            });
-        }
+        if (!_validation.IsValid(message, out string error))
+            return BadRequest(new { success = false, error });
 
-        var alerts = await _detectionService.AnalyzeAsync(
-            message,
-            cancellationToken);
-
-        var riskScore = _riskScoringService.CalculateRiskScore(
-            message.Icao,
-            alerts);
-
-        // Notify connected dashboard clients about aircraft updates.
-        await _hubContext.Clients.All.SendAsync(
-            "AircraftUpdated",
-            message,
-            cancellationToken);
-
-        // Notify connected dashboard clients about detected anomalies.
-        foreach (var alert in alerts)
-        {
-            await _hubContext.Clients.All.SendAsync(
-                "AlertRaised",
-                alert,
-                cancellationToken);
-        }
+        var result = await _processor.ProcessAsync(message, _state, true, cancellationToken);
 
         return Ok(new
         {
-            Success = true,
-            Icao = message.Icao,
-            Alerts = alerts,
-            RiskScore = riskScore
+            success = true,
+            icao = result.Message.Icao,
+            anomalyDetected = result.Alerts.Count > 0,
+            alerts = result.Alerts,
+            riskScore = result.Risk
         });
     }
 }

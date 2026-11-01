@@ -1,24 +1,35 @@
-﻿using SkyShield.Models;
+using SkyShield.Models;
 
 namespace SkyShield.Services.Demo;
 
+/// <summary>Creates the synthetic fleet used for normal monitoring.</summary>
 public class DemoAircraftGenerator
 {
-    private const int AircraftCount = 50;
+    public const int AircraftCount = 50;
+
+    // Demonstration area (Romania and surroundings).
+    public const double MinLatitude = 43.6, MaxLatitude = 48.0;
+    public const double MinLongitude = 20.6, MaxLongitude = 29.0;
 
     private readonly Random _random = new();
 
+    /// <summary>True for ICAOs produced by this generator (D00000..D00031).</summary>
+    public static bool IsDemoAircraft(string icao) =>
+        icao.Length == 6 && icao[0] == 'D' &&
+        int.TryParse(icao.AsSpan(1), System.Globalization.NumberStyles.HexNumber, null, out int index) &&
+        index < AircraftCount;
+
     public IReadOnlyList<AircraftMessage> GenerateAircraft()
     {
-        var aircraft = new List<AircraftMessage>();
+        var aircraft = new List<AircraftMessage>(AircraftCount);
 
         for (int i = 0; i < AircraftCount; i++)
         {
             aircraft.Add(new AircraftMessage
             {
-                Icao = GenerateIcao(i),
-                Latitude = 43.5 + _random.NextDouble() * 4.5,
-                Longitude = 20.5 + _random.NextDouble() * 8.5,
+                Icao = $"D{i:X5}",
+                Latitude = MinLatitude + _random.NextDouble() * (MaxLatitude - MinLatitude),
+                Longitude = MinLongitude + _random.NextDouble() * (MaxLongitude - MinLongitude),
                 AltitudeFeet = _random.Next(18000, 41000),
                 GroundSpeedKnots = _random.Next(350, 520),
                 TimestampUtc = DateTimeOffset.UtcNow
@@ -26,10 +37,5 @@ public class DemoAircraftGenerator
         }
 
         return aircraft;
-    }
-
-    private static string GenerateIcao(int index)
-    {
-        return $"D{index:X5}";
     }
 }

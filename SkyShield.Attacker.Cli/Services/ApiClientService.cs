@@ -1,40 +1,64 @@
 using System.Net.Http.Json;
+using System.Text.Json;
 using SkyShield.Attacker.Cli.Models;
 
 namespace SkyShield.Attacker.Cli.Services;
 
+/// <summary>Talks to the local SkyShield backend. The CLI never raises alerts itself.</summary>
 public class ApiClientService
 {
-    private readonly HttpClient _httpClient;
-    private const string Endpoint = "/api/flights";
+    private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
-    public ApiClientService(HttpClient httpClient)
+    private readonly HttpClient _http;
+
+    public ApiClientService(HttpClient http) => _http = http;
+
+    public Uri BaseAddress => _http.BaseAddress!;
+
+    public async Task<HealthDto?> GetHealthAsync()
     {
-        _httpClient = httpClient;
-    }
-
-    public async Task SendTelemetryAsync(FlightTelemetryDto payload)
-    {
-        Console.WriteLine($"[INFO] Trimitere telemetrie pt ICAO: {payload.Icao} | Lat: {payload.Latitude}, Lon: {payload.Longitude}, Alt: {payload.AltitudeFeet}ft");
-
         try
         {
-            var response = await _httpClient.PostAsJsonAsync(Endpoint, payload);
-
-            if (response.IsSuccessStatusCode)
-            {
-                Console.WriteLine($"[SUCCESS] API-ul a acceptat mesajul. Status: {(int)response.StatusCode}");
-            }
-            else
-            {
-                var errorMsg = await response.Content.ReadAsStringAsync();
-                Console.WriteLine($"[WARNING] API-ul a respins mesajul. Status: {(int)response.StatusCode} | Motiv: {errorMsg}");
-            }
+            return await _http.GetFromJsonAsync<HealthDto>("/api/health", Json);
         }
-        catch (HttpRequestException ex)
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or JsonException)
         {
-            Console.WriteLine($"[ERROR] Nu se poate conecta la API pe {_httpClient.BaseAddress}. Asigură-te că SkyShield rulează.");
-            Console.WriteLine($"[ERROR] Detalii: {ex.Message}");
+            return null;
         }
+    }
+
+    public async Task<List<TelemetryDto>> GetFlightsAsync()
+    {
+        try
+        {
+            return await _http.GetFromJsonAsync<List<TelemetryDto>>("/api/flights", Json) ?? new();
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or JsonException)
+        {
+            return new();
+        }
+    }
+
+    public async Task<SimulationResponse> SubmitAsync(string scenario, TelemetryDto message)
+    {
+        var response = await _http.PostAsJsonAsync(
+            "/api/simulation/events", new SimulationEventRequest(scenario, message), Json);
+
+        var body = await response.Content.ReadFromJsonAsync<SimulationResponse>(Json)
+                   ?? new SimulationResponse { Error = "Empty response from backend." };
+
+        if (!response.IsSuccessStatusCode)
+        {
+            body.Success = false;
+            body.Error ??= $"HTTP {(int)response.StatusCode}";
+        }
+
+        return body;
+    }
+
+    public async Task<bool> ResetAsync(bool broadcast)
+    {
+        var response = await _http.PostAsync($"/api/simulation/reset?broadcast={broadcast.ToString().ToLowerInvariant()}", null);
+        return response.IsSuccessStatusCode;
     }
 }

@@ -4,8 +4,8 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>SkyShield – Aircraft Monitoring Dashboard</title>
-  <!-- Leaflet (harta) -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <!-- Leaflet (map), served locally so the demo works offline -->
+  <link rel="stylesheet" href="lib/leaflet/leaflet.css" />
   <link rel="stylesheet" href="css/dashboard.css" />
 </head>
 <body>
@@ -33,10 +33,11 @@
 
     <aside class="side">
       <section class="panel">
-        <div class="panel-head"><h2>Risk overview</h2></div>
+        <div class="panel-head"><h2>Risk overview</h2><span class="muted">aircraft by highest alert</span></div>
         <div class="risk-overview">
           <div class="risk-box" data-level="low"><span class="num" id="risk-low">0</span><span>Low</span></div>
           <div class="risk-box" data-level="medium"><span class="num" id="risk-medium">0</span><span>Medium</span></div>
+          <div class="risk-box" data-level="high"><span class="num" id="risk-high">0</span><span>High</span></div>
           <div class="risk-box" data-level="critical"><span class="num" id="risk-critical">0</span><span>Critical</span></div>
         </div>
       </section>
@@ -66,8 +67,8 @@
   </main>
 
   <!-- Biblioteci externe -->
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@microsoft/signalr@8.0.7/dist/browser/signalr.min.js"></script>
+  <script src="lib/leaflet/leaflet.js"></script>
+  <script src="lib/signalr/signalr.min.js"></script>
   <!-- Fișierele noastre JS: ordinea contează, fiecare îl folosește pe precedentul -->
   <script src="js/config.js"></script>
   <script src="js/state.js"></script>

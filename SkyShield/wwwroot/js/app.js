@@ -19,6 +19,15 @@ SkyShield.App = (function () {
     return flights;
   }
 
+  // Refreshes the aircraft list without touching alerts (after a reset or reconnect).
+  async function reloadAircraft() {
+    try {
+      SkyShield.State.replaceAllAircraft(await loadFlights());
+    } catch (error) {
+      console.warn('SkyShield: could not refresh aircraft.', error);
+    }
+  }
+
   function showMode() {
     const label = document.querySelector('.brand-sub');
     if (label) label.textContent = demo
@@ -67,11 +76,14 @@ SkyShield.App = (function () {
     // Retry starting if the server appears later.
     setInterval(function () {
       const status = SkyShield.State.getSnapshot().connection;
-      if (!liveConnected && status !== 'connecting') connect();
+      if (!liveConnected && status !== 'connecting' && status !== 'reconnecting') connect();
     }, SkyShield.Config.refreshIntervalMs);
+    setInterval(function () {
+      SkyShield.State.checkStatusFreshness(SkyShield.Config.statusTimeoutMs);
+    }, 2000);
   }
 
-  return { start };
+  return { start, reloadAircraft };
 })();
 
 if (document.readyState === 'loading') {

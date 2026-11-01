@@ -36,6 +36,7 @@ SkyShield.Map = (function () {
     const level = hasAlert ? SkyShield.State.riskLevel(riskByIcao.get(icao)) : null;
     const color = !hasAlert ? cssColor('--no-risk', '')
                 : level === 'critical' ? cssColor('--critical', '')
+                : level === 'high'    ? cssColor('--high', '')
                 : level === 'medium'  ? cssColor('--medium', '')
                 : cssColor('--low', '');
     const border = hasAlert ? color : cssColor('--no-risk-border', '');
@@ -64,9 +65,7 @@ SkyShield.Map = (function () {
                     || document.querySelector('.map-panel span')
                     || document.getElementById('map-aircraft-count');
     if (mapCountEl) {
-      const count = s.aircraft.length;
-      const label = count === 1 ? 'aircraft' : 'aircrafts';
-      mapCountEl.textContent = `${count} ${label}`;
+      mapCountEl.textContent = s.aircraft.length + ' aircraft';
     }
 
     const riskByIcao = highestRisk(s.alerts);
@@ -80,6 +79,7 @@ SkyShield.Map = (function () {
       if (!marker) {
         marker = L.circleMarker([a.latitude, a.longitude], style);
         marker.bindPopup(popupText(a));
+        marker.bindTooltip(a.icao, { permanent: true, direction: 'right', offset: [6, 0], className: 'icao-label' });
         marker.on('click', () => SkyShield.State.select(a.icao));
         marker.addTo(map);
         markers.set(a.icao, marker);

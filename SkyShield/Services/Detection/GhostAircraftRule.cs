@@ -1,40 +1,30 @@
-﻿using Microsoft.Extensions.Configuration;
 using SkyShield.Models;
+using SkyShield.Services.AircraftState;
 
 namespace SkyShield.Services.Detection;
 
+/// <summary>Flags telemetry from an ICAO that is not part of the known fleet.</summary>
 public class GhostAircraftRule : IDetectionRule
 {
-    private readonly HashSet<string> _authorizedAircraft;
+    public const string Type = "Ghost Aircraft";
 
-    public GhostAircraftRule(IConfiguration configuration)
+    private readonly FleetRegistry _fleet;
+
+    public GhostAircraftRule(FleetRegistry fleet) => _fleet = fleet;
+
+    public AnomalyAlert? Detect(DetectionContext context)
     {
-        _authorizedAircraft = configuration
-            .GetSection("AuthorizedAircraft")
-            .GetChildren()
-            .Select(x => x.Value?.Trim().ToUpperInvariant())
-            .Where(x => !string.IsNullOrWhiteSpace(x))
-            .ToHashSet()!;
-    }
+        var message = context.Message;
 
-    public AnomalyAlert? Detect(
-        AircraftMessage message,
-        AircraftMessage? previousState)
-    {
-        string icao = message.Icao?.Trim().ToUpperInvariant() ?? "";
-
-        if (_authorizedAircraft.Contains(icao))
-        {
+        if (_fleet.IsKnown(message.Icao))
             return null;
-        }
 
         return new AnomalyAlert
         {
-            Icao = icao,
-            AnomalyType = "Unknown Aircraft",
-            Severity = "Medium",
-            RiskScore = 30,
-            Description = $"Aircraft with ICAO {icao} is not in the authorized aircraft list.",
+            Icao = message.Icao,
+            AnomalyType = Type,
+            RiskScore = 55,
+            Description = $"Aircraft {message.Icao} is transmitting but is not in the authorized fleet.",
             DetectedAtUtc = DateTimeOffset.UtcNow,
             Latitude = message.Latitude,
             Longitude = message.Longitude

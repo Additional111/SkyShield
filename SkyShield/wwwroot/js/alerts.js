@@ -32,11 +32,13 @@ SkyShield.Alerts = (function () {
     var level = SkyShield.State.riskLevel(score);
     var icao = field(a, 'icao', 'Icao');
     var type = field(a, 'anomalyType', 'AnomalyType');
+    var severity = field(a, 'severity', 'Severity') || '';
     var desc = field(a, 'description', 'Description');
     var when = timeOf(field(a, 'detectedAtUtc', 'DetectedAtUtc'));
     return '<li data-level="' + level + '" data-icao="' + esc(icao) + '">'
+      + '<span class="badge" data-level="' + level + '">' + esc(severity || level) + ' · ' + score + '</span> '
       + '<strong>' + esc(icao) + '</strong> · ' + esc(type)
-      + ' <span class="muted">(risk ' + score + ', ' + when + ')</span>'
+      + ' <span class="muted">' + when + '</span>'
       + (desc ? '<br><span class="muted">' + esc(desc) + '</span>' : '')
       + '</li>';
   }
@@ -54,7 +56,7 @@ SkyShield.Alerts = (function () {
     }
 
     // 2. Risk summary: the highest level per aircraft
-    var counts = { low: 0, medium: 0, critical: 0 };
+    var counts = { low: 0, medium: 0, high: 0, critical: 0 };
     var worstByIcao = {};
     alerts.forEach(function (a) {
       var icao = field(a, 'icao', 'Icao');
@@ -68,6 +70,7 @@ SkyShield.Alerts = (function () {
     });
     riskEls.low.textContent = String(counts.low);
     riskEls.medium.textContent = String(counts.medium);
+    riskEls.high.textContent = String(counts.high);
     riskEls.critical.textContent = String(counts.critical);
   }
 
@@ -77,6 +80,7 @@ SkyShield.Alerts = (function () {
     riskEls = {
       low: document.getElementById('risk-low'),
       medium: document.getElementById('risk-medium'),
+      high: document.getElementById('risk-high'),
       critical: document.getElementById('risk-critical')
     };
     if (!listEl || !countEl) return;

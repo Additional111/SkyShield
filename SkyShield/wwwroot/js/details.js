@@ -54,7 +54,7 @@ SkyShield.Details = (function () {
     el.classList.remove('muted');
     var worst = worstAlert(snap.alerts, a.icao);
     var level = worst ? SkyShield.State.riskLevel(worst.riskScore) : 'low';
-    var levelText = level === 'critical' ? 'Critical' : level === 'medium' ? 'Medium' : 'Low';
+    var levelText = level.charAt(0).toUpperCase() + level.slice(1);
 
     el.innerHTML =
       row('ICAO', '<strong>' + esc(a.icao) + '</strong>') +

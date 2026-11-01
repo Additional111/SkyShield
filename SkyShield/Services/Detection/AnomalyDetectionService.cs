@@ -1,57 +1,56 @@
-﻿using SkyShield.Models;
+using SkyShield.Models;
 using SkyShield.Services.AircraftState;
 
 namespace SkyShield.Services.Detection;
 
+/// <summary>
+/// Runs every registered rule against a message. Rules are independent:
+/// add or remove one by changing its registration in Program.cs.
+/// </summary>
 public class AnomalyDetectionService : IAnomalyDetectionService
 {
-    private readonly IAircraftStateService _aircraftStateService;
     private readonly IEnumerable<IDetectionRule> _rules;
+    private readonly ILogger<AnomalyDetectionService> _logger;
 
     public AnomalyDetectionService(
-        IAircraftStateService aircraftStateService,
-        IEnumerable<IDetectionRule> rules)
+        IEnumerable<IDetectionRule> rules,
+        ILogger<AnomalyDetectionService> logger)
     {
-        _aircraftStateService = aircraftStateService;
         _rules = rules;
+        _logger = logger;
     }
 
-    public Task<IReadOnlyList<AnomalyAlert>> AnalyzeAsync(
-        AircraftMessage message,
-        CancellationToken cancellationToken = default)
+    public IReadOnlyList<AnomalyAlert> Analyze(AircraftMessage message, IAircraftStateService state)
     {
         ArgumentNullException.ThrowIfNull(message);
-        cancellationToken.ThrowIfCancellationRequested();
+        ArgumentNullException.ThrowIfNull(state);
 
-        var alerts = new List<AnomalyAlert>();
+        var update = state.Update(message);
+        var context = new DetectionContext(message, update.Previous, update.History);
 
-        AircraftMessage? previousState = null;
-
-        if (!string.IsNullOrWhiteSpace(message.Icao))
-        {
-            if (message.TimestampUtc != default)
-            {
-                previousState = _aircraftStateService.UpdateState(message);
-            }
-            else
-            {
-                previousState = _aircraftStateService.GetState(message.Icao);
-            }
-        }
+        var fired = new List<(IDetectionRule Rule, AnomalyAlert Alert)>();
 
         foreach (var rule in _rules)
         {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            var alert = rule.Detect(message, previousState);
-
-            if (alert != null)
+            try
             {
-                alerts.Add(alert);
+                var alert = rule.Detect(context);
+                if (alert != null)
+                    fired.Add((rule, alert));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Detection rule {Rule} failed.", rule.GetType().Name);
             }
         }
 
-        return Task.FromResult<IReadOnlyList<AnomalyAlert>>(
-            alerts.AsReadOnly());
+        var superseded = fired
+            .SelectMany(f => f.Rule.Supersedes)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        return fired
+            .Select(f => f.Alert)
+            .Where(a => !superseded.Contains(a.AnomalyType))
+            .ToList();
     }
 }

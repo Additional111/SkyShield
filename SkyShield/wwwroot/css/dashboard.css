@@ -6,7 +6,8 @@
   --muted: #8a99b4;
   --accent: #38bdf8;
   --low: #22c55e;
-  --medium: #f59e0b;
+  --medium: #eab308;
+  --high: #f97316;
   --critical: #ef4444;
   --radius: 8px;
   --no-risk: #c5c7c9;
@@ -68,7 +69,7 @@ h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: v
 /* Zona de Risc */
 .risk-overview { 
   display: grid; 
-  grid-template-columns: repeat(3, 1fr); 
+  grid-template-columns: repeat(4, 1fr); 
   gap: 8px; 
   padding: 12px; 
 }
@@ -104,6 +105,9 @@ h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: v
   color: var(--medium); 
 }
 
+.risk-box[data-level="high"] { border-color: var(--high); background: rgba(249, 115, 22, 0.07); }
+.risk-box[data-level="high"] .num { color: var(--high); }
+
 .risk-box[data-level="critical"] { 
   border-color: var(--critical); 
 }
@@ -119,6 +123,7 @@ h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: v
 .details { padding: 12px 14px; display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; }
 .details span[data-level="low"] { color: var(--low); }
 .details span[data-level="medium"] { color: var(--medium); }
+.details span[data-level="high"] { color: var(--high); }
 .details span[data-level="critical"] { color: var(--critical); }
 
 /* Alerte */
@@ -128,7 +133,22 @@ h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: v
 .alerts li.empty { border: none; background: none; }
 .alerts li[data-level="low"] { border-left-color: var(--low); }
 .alerts li[data-level="medium"] { border-left-color: var(--medium); }
+.alerts li[data-level="high"] { border-left-color: var(--high); }
 .alerts li[data-level="critical"] { border-left-color: var(--critical); background: rgba(239, 68, 68, .12); }
+
+/* Alert severity badge */
+.badge { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; text-transform: uppercase; color: #0b1220; background: var(--muted); }
+.badge[data-level="low"] { background: var(--low); }
+.badge[data-level="medium"] { background: var(--medium); }
+.badge[data-level="high"] { background: var(--high); }
+.badge[data-level="critical"] { background: var(--critical); color: #fff; }
+.alerts li { animation: alert-in .35s ease-out; }
+@keyframes alert-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+
+/* Aircraft labels on the map */
+.leaflet-tooltip.icao-label { background: rgba(11, 18, 32, .78); color: #e6edf7; border: none; box-shadow: none; padding: 0 4px; font-size: 10px; line-height: 14px; }
+.leaflet-tooltip.icao-label::before { display: none; }
+#map { background: #1b2740; }
 
 /* Tabel */
 .table-wrap { overflow: auto; max-height: 260px; }

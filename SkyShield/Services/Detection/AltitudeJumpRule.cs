@@ -1,78 +1,54 @@
-﻿
 using System.Globalization;
-using Microsoft.Extensions.Configuration;
 using SkyShield.Models;
 
 namespace SkyShield.Services.Detection;
 
+/// <summary>Flags altitude changes faster than any aircraft can climb or descend.</summary>
 public class AltitudeJumpRule : IDetectionRule
 {
-    private const double DefaultMaxVerticalSpeed = 10000.0;
+    public const string Type = "Altitude Jump";
 
-    private readonly double _maxVerticalSpeed;
+    private const double DefaultMaxFeetPerMinute = 10000.0;
+    private const double MinimumElapsedSeconds = 1.0;
+
+    private readonly double _maxFeetPerMinute;
 
     public AltitudeJumpRule(IConfiguration configuration)
     {
-        string? configuredValue =
-            configuration["Detection:MaxAltitudeChangeFeetPerMinute"];
-
-        if (double.TryParse(
-                configuredValue,
-                NumberStyles.Float,
-                CultureInfo.InvariantCulture,
-                out double configuredSpeed) &&
-            double.IsFinite(configuredSpeed) &&
-            configuredSpeed > 0)
-        {
-            _maxVerticalSpeed = configuredSpeed;
-        }
-        else
-        {
-            _maxVerticalSpeed = DefaultMaxVerticalSpeed;
-        }
+        _maxFeetPerMinute = double.TryParse(
+            configuration["Detection:MaxAltitudeChangeFeetPerMinute"],
+            NumberStyles.Float, CultureInfo.InvariantCulture, out var v) && v > 0
+            ? v : DefaultMaxFeetPerMinute;
     }
 
-    public AnomalyAlert? Detect(
-        AircraftMessage message,
-        AircraftMessage? previousState)
+    public AnomalyAlert? Detect(DetectionContext context)
     {
-        if (previousState == null)
+        var message = context.Message;
+        var previous = context.Previous;
+
+        if (previous == null)
             return null;
 
-        if (message.TimestampUtc == default ||
-            previousState.TimestampUtc == default)
+        double elapsedSeconds = (message.TimestampUtc - previous.TimestampUtc).TotalSeconds;
+
+        if (elapsedSeconds < MinimumElapsedSeconds)
             return null;
 
-        if (!double.IsFinite(message.AltitudeFeet) ||
-            !double.IsFinite(previousState.AltitudeFeet))
-            return null;
+        double change = Math.Abs(message.AltitudeFeet - previous.AltitudeFeet);
+        double feetPerMinute = change / (elapsedSeconds / 60.0);
 
-        double elapsedMinutes =
-            (message.TimestampUtc - previousState.TimestampUtc)
-            .TotalMinutes;
-
-        if (elapsedMinutes <= 0)
-            return null;
-
-        double altitudeDifference = Math.Abs(
-            message.AltitudeFeet - previousState.AltitudeFeet);
-
-        double verticalSpeed = altitudeDifference / elapsedMinutes;
-
-        if (!double.IsFinite(verticalSpeed) ||
-            verticalSpeed <= _maxVerticalSpeed)
+        if (!double.IsFinite(feetPerMinute) || feetPerMinute <= _maxFeetPerMinute)
             return null;
 
         return new AnomalyAlert
         {
             Icao = message.Icao,
-            AnomalyType = "Altitude Jump",
-            Severity = "Critical",
-            RiskScore = 25,
+            AnomalyType = Type,
+            RiskScore = 65,
             Description =
-                $"Aircraft altitude changed by {altitudeDifference:F2} feet " +
-                $"at a rate of {verticalSpeed:F2} feet per minute.",
-            DetectedAtUtc = message.TimestampUtc,
+                $"Altitude changed by {change:F0} ft in {elapsedSeconds:F0} s " +
+                $"({feetPerMinute:F0} ft/min, limit {_maxFeetPerMinute:F0} ft/min).",
+            DetectedAtUtc = DateTimeOffset.UtcNow,
             Latitude = message.Latitude,
             Longitude = message.Longitude
         };
